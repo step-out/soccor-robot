@@ -4,9 +4,9 @@
 
 #include "compress.h"
 
-// #include <rcssbase/net/socketstreambuf.hpp>
-// #include <rcssbase/net/udpsocket.hpp>
-// #include <rcssbase/gzip/gzstream.hpp>
+#include <rcssbase/net/socketstreambuf.hpp>
+#include <rcssbase/net/udpsocket.hpp>
+#include <rcssbase/gzip/gzstream.hpp>
 
 #ifdef HAVE_SSTREAM
 #include <sstream>
@@ -38,9 +38,9 @@
 
 using namespace std;
 
-const double PI = 3.14159265359;    // 圆周率
+const double PI = 3.14159265359;           // 圆周率
 const char TEAM_NAME[20] = "soccor-eater"; // 球队名称
-const double MARGIN = 0.7;          // 可踢范围0.7米
+const double MARGIN = 0.7;                 // 可踢范围0.7米
 const double RATE = 0.027;
 const double PLAYER_SIZE = 0.3; // 球员大小
 const double BALL_SIZE = 0.085; // 球的大小
@@ -104,16 +104,16 @@ char command[50]; // 向server发送的消息
 struct Flags // 标志
 {
     bool visible; // 能否看见
-    double dist; // 距离
-    double dir;  // 方向
-} flags[55];     // 55个标志
+    double dist;  // 距离
+    double dir;   // 方向
+} flags[55];      // 55个标志
 
 struct Ball // 球
 {
-    bool visible;               // 能否看见
+    bool visible;              // 能否看见
     bool moving;               // 是否在移动
-    double diff_dist;           // 距离的相对变化
-    double diff_dir;            // 方向的相对变化
+    double diff_dist;          // 距离的相对变化
+    double diff_dir;           // 方向的相对变化
     double x[50];              // x坐标
     double y[50];              // y坐标
     double dist;               // 距离
@@ -164,7 +164,7 @@ struct Lines // 边线
 } lines[4];
 
 char line_name[4][6] = {"(l l)", "(l r)", "(l t)", "(l b)"}; // 边线名称
-double line_global_angle[4] = {-180, 0, -90, 90};           // 边线的全局角度
+double line_global_angle[4] = {-180, 0, -90, 90};            // 边线的全局角度
 
 double AngToRad(double x) // 角度转弧度
 {
@@ -267,19 +267,19 @@ public:
     }
     int Open()
     {
-        if (M_socket.Open())
+        if (M_socket.open())
         {
             if (M_socket.setNonBlocking() < 0)
             {
                 std::cerr << __FILE__ << ": " << __LINE__ << ": Error setting socket non-blocking: " << strerror(errno) << std::endl;
-                M_socket.Close();
+                M_socket.close();
                 return -1;
             }
         }
         else
         {
             std::cerr << __FILE__ << ": " << __LINE__ << ": Error opening socket: " << strerror(errno) << std::endl;
-            M_socket.Close();
+            M_socket.close();
             return -1;
         }
 
@@ -289,17 +289,17 @@ public:
     }
     bool Bind()
     {
-        if (!M_socket.Bind(rcss::net::Addr()))
+        if (!M_socket.bind(rcss::net::Addr()))
         {
             std::cerr << __FILE__ << ": " << __LINE__ << ": Error connecting socket" << std::endl;
-            M_socket.Close();
+            M_socket.close();
             return false;
         }
         return true;
     }
     void Close()
     {
-        M_socket.Close();
+        M_socket.close();
         if (M_transport)
         {
             delete M_transport;
@@ -356,87 +356,87 @@ public:
             ParseMsg(msg);
         }
     }
-    void MessageLoop()
-    {
-        fd_set read_fds;
-        fd_set read_fds_back;
-        char buf[8192];
-        memset(&buf, 0, sizeof(char) * 8192);
-        int in = fileno(stdin);
-        FD_ZERO(&read_fds);
-        FD_SET(in, &read_fds);
-        FD_SET(M_socket.getFD(), &read_fds);
-        read_fds_back = read_fds;
+void MessageLoop()
+{
+    fd_set read_fds;
+    fd_set read_fds_back;
+    char buf[8192];
+    memset(&buf, 0, sizeof(char) * 8192);
+    int in = fileno(stdin);
+    FD_ZERO(&read_fds);
+    FD_SET(in, &read_fds);
+    FD_SET(M_socket.getFD(), &read_fds);
+    read_fds_back = read_fds;
 #ifdef RCSS_WIN
-        int max_fd = 0;
+    int max_fd = 0;
 #else
-        int max_fd = M_socket.getFD() + 1;
+    int max_fd = M_socket.getFD() + 1;
 #endif
-        while (1)
+    while (1)
+    {
+        read_fds = read_fds_back;
+        int ret = ::select(max_fd, &read_fds, NULL, NULL, NULL);
+        if (ret < 0)
         {
-            read_fds = read_fds_back;
-            int ret = ::select(max_fd, &read_fds, NULL, NULL, NULL);
-            if (ret < 0)
+            perror("Error selecting input");
+            break;
+        }
+        else if (ret != 0)
+        {
+            if (FD_ISSET(in, &read_fds))
             {
-                perror("Error selecting input");
-                break;
-            }
-            else if (ret != 0)
-            {
-                if (FD_ISSET(in, &read_fds))
+                if (std::fgets(buf, sizeof(buf), stdin) != NULL)
                 {
-                    if (std::fgets(buf, sizeof(buf), stdin) != NULL)
+                    size_t len = std::strlen(buf);
+                    if (buf[len - 1] == '\n')
                     {
-                        size_t len = std::strlen(buf);
-                        if (buf[len - 1] == '\n')
-                        {
-                            buf[len - 1] = '\0';
-                            --len;
-                        }
-
-                        M_transport->write(buf, len + 1);
-                        M_transport->flush();
-                        if (!M_transport->good())
-                        {
-                            if (errno != ECONNREFUSED)
-                            {
-                                std::cerr << __FILE__ << ": " << __LINE__ << ": Error sending to socket: " << strerror(errno) << std::endl
-                                          << "msg = [" << buf << "]\n";
-                            }
-                            M_socket.Close();
-                        }
-                        std::cout << buf << std::endl;
+                        buf[len - 1] = '\0';
+                        --len;
                     }
-                }
-                if (FD_ISSET(M_socket.getFD(), &read_fds))
-                {
-                    rcss::net::Addr from;
-                    int len = M_socket.recv(buf, sizeof(buf) - 1, from);
-                    if (len == -1 && errno != EWOULDBLOCK)
+
+                    M_transport->write(buf, len + 1);
+                    M_transport->flush();
+                    if (!M_transport->good())
                     {
                         if (errno != ECONNREFUSED)
                         {
-                            std::cerr << __FILE__ << ": " << __LINE__ << ": Error receiving from socket: " << strerror(errno) << std::endl;
+                            std::cerr << __FILE__ << ": " << __LINE__ << ": Error sending to socket: " << strerror(errno) << std::endl
+                                        << "msg = [" << buf << "]\n";
                         }
-                        M_socket.Close();
+                        M_socket.close();
                     }
-                    else if (len > 0)
+                    std::cout << buf << std::endl;
+                }
+            }
+            if (FD_ISSET(M_socket.getFD(), &read_fds))
+            {
+                rcss::net::Addr from;
+                int len = M_socket.recv(buf, sizeof(buf) - 1, from);
+                if (len == -1 && errno != EWOULDBLOCK)
+                {
+                    if (errno != ECONNREFUSED)
                     {
-                        M_dest.setPort(from.getPort());
-                        M_socket_buf->setEndPoint(M_dest);
-                        ProcessMsg(buf, len);
+                        std::cerr << __FILE__ << ": " << __LINE__ << ": Error receiving from socket: " << strerror(errno) << std::endl;
                     }
+                    M_socket.close();
+                }
+                else if (len > 0)
+                {
+                    M_dest.setPort(from.getPort());
+                    M_socket_buf->setEndPoint(M_dest);
+                    ProcessMsg(buf, len);
                 }
             }
         }
     }
+}
     // 向server发送命令
     bool SendCmd(char *command);
     // 解析server发送的信息
-    void Init(char *msg);       // 初始化
-    void Hear(char *msg);       // Hear，获知比赛模式
+    void Init(char *msg);      // 初始化
+    void Hear(char *msg);      // Hear，获知比赛模式
     void SenseBody(char *msg); // SenseBody
-    void See(char *msg);        // See，看到标志、边线、球、球员等信息
+    void see(char *msg);       // See，看到标志、边线、球、球员等信息
     // 球员基础行为命令
     void Kick(double power, double direction);
     void Dash(double power, double direction);
@@ -448,7 +448,7 @@ public:
     void ChangeView(const char *width, const char *quality);
     // 辅助函数
     void UpdateINFO();                // 更新信息
-    bool Turn(double angle);          // 转过一定角度
+    bool turn(double angle);          // 转过一定角度
     bool GotoPos(double x, double y); // 定点前往(x,y)
     bool BallINField();               // 球是否在自己的活动范围内
     bool BallINPenalty();             // 球是否在己方禁区内
@@ -854,7 +854,7 @@ void Client::UpdateINFO() // 更新信息
     }
 }
 
-bool Client::Turn(double angle) // 转过一定角度
+bool Client::turn(double angle) // 转过一定角度
 {
     static int turn_times = 0;
     static double turn_angle = 0;
@@ -995,7 +995,7 @@ void Client::ParseMsg(char *msg)
     }
     else if (!strncmp(msg, "(see", 4)) // see
     {
-        See(msg);
+        see(msg);
         UpdateINFO(); // 更新信息
     }
     else
@@ -1016,7 +1016,7 @@ void Client::ParseMsg(char *msg)
             SendCmd(command);
             return;
         }
-        else if (Turn(Sub(CalDir(x, y, 0, 0), body_global_angle))) // 面向(0,0)的位置
+        else if (turn(Sub(CalDir(x, y, 0, 0), body_global_angle))) // 面向(0,0)的位置
         {
             SendCmd(command);
             return;
@@ -1117,7 +1117,7 @@ void Client::ParseMsg(char *msg)
                     SendCmd(command);
                     return;
                 }
-                else if (Turn(ball.dir))
+                else if (turn(ball.dir))
                 {
                     SendCmd(command);
                     return;
@@ -1147,7 +1147,7 @@ void Client::ParseMsg(char *msg)
                     SendCmd(command);
                     return;
                 }
-                else if (Turn(ball.dir))
+                else if (turn(ball.dir))
                 {
                     SendCmd(command);
                     return;
@@ -1170,7 +1170,7 @@ void Client::ParseMsg(char *msg)
         }
         if (role != striker)
         {
-            if (Distance(x, y, sidex, sidey) >= MARGIN && Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
+            if (Distance(x, y, sidex, sidey) >= MARGIN && turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
                 SendCmd(command);
                 return;
@@ -1202,7 +1202,7 @@ void Client::ParseMsg(char *msg)
             return;
         if (role != striker)
         {
-            if (Distance(x, y, sidex, sidey) >= MARGIN && Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
+            if (Distance(x, y, sidex, sidey) >= MARGIN && turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
                 SendCmd(command);
                 return;
@@ -1407,7 +1407,7 @@ void Client::ParseMsg(char *msg)
     {
         if (x < minx || x > maxx || y < miny || y > maxy) // 超出了活动范围
         {
-            if (Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
+            if (turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
                 SendCmd(command);
                 return;
