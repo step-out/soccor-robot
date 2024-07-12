@@ -551,8 +551,6 @@ void Client::SenseBody(char *msg) // SenseBody
            &speed, &speed_to_head_dir, &head_to_body_angle, &kick_times, &catch_times);
     view_width[strlen(view_width) - 1] = 0;
 
-    enum 
-
     if (!strcmp(view_width, "wide"))
         view_angle = 180; // 宽视野视角为180度
     else if (!strcmp(view_width, "normal"))
@@ -721,7 +719,7 @@ void Client::Dash(double power, double direction)
     如果体力值高于加速效率递增阈值, 则加速效率会提高, 每周期增加EFFORT_INC = 0.01
     加速效率递增阈值 = EFFORT_INC_THR(0.6) * STAMINA_MAX(8000)
     */
-    sprintf(command, "(dash %lf)", power);
+    sprintf(command, "(dash %lf %lf)", power, direction);
 }
 void Client::Turn(double moment)
 {
@@ -731,7 +729,7 @@ void Client::Turn(double moment)
     球员惯性大小参数inertia_moment = IMPARAM = 5.0
     注意：球员不能在同一个周期同时执行dash和Turn两个命令
     */
-    sprintf(command, "(Turn %lf)", moment);
+    sprintf(command, "(turn %lf)", moment);
 }
 void Client::Turn_neck(double moment)
 {
@@ -1106,14 +1104,16 @@ void Client::ParseMsg(char *msg)
                         catched = 0;
                         waited = 0;
                         wait = 0;
-                        sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                        // sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                        Kick(100, Sub(side ? 180 : 0, body_global_angle));
                         SendCmd(command);
                         return;
                     }
                 }
                 else if (!ball.visible)
                 {
-                    sprintf(command, "(turn %lf)", view_angle);
+                    // sprintf(command, "(turn %lf)", view_angle);
+                    Turn(view_angle);
                     SendCmd(command);
                     return;
                 }
@@ -1129,7 +1129,8 @@ void Client::ParseMsg(char *msg)
                 }
                 else
                 {
-                    sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                    // sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                    Kick(100, Sub(side ? 180 : 0, body_global_angle));
                     SendCmd(command);
                     return;
                 }
@@ -1141,7 +1142,8 @@ void Client::ParseMsg(char *msg)
             {
                 if (!ball.visible)
                 {
-                    sprintf(command, "(turn %lf)", view_angle);
+                    // sprintf(command, "(turn %lf)", view_angle);
+                    Turn(view_angle);
                     SendCmd(command);
                     return;
                 }
@@ -1159,7 +1161,8 @@ void Client::ParseMsg(char *msg)
                 {
                     CanGoal();
                     kickdir = goaldir;
-                    sprintf(command, "(kick 100 %lf)", kickdir);
+                    // sprintf(command, "(kick 100 %lf)", kickdir);
+                    Kick(100, kickdir);
                     SendCmd(command);
                     return;
                 }
@@ -1180,7 +1183,8 @@ void Client::ParseMsg(char *msg)
         }
         if (!ball.visible)
         {
-            sprintf(command, "(turn %lf)", view_angle);
+            // sprintf(command, "(turn %lf)", view_angle);
+            Turn(view_angle);
             SendCmd(command);
             return;
         }
@@ -1211,7 +1215,8 @@ void Client::ParseMsg(char *msg)
         }
         if (!ball.visible)
         {
-            sprintf(command, "(turn %lf)", view_angle);
+            // sprintf(command, "(turn %lf)", view_angle);
+            Turn(view_angle);
             SendCmd(command);
             return;
         }
@@ -1224,26 +1229,30 @@ void Client::ParseMsg(char *msg)
         {
             if (fabs(ball.dir) > 90)
             {
-                sprintf(command, "(dash 100 %lf)", ball.dir);
+                // sprintf(command, "(dash 100 %lf)", ball.dir);
+                Dash(100, ball.dir);
                 SendCmd(command);
                 return;
             }
             else
             {
-                sprintf(command, "(catch %lf)", Add(head_to_body_angle, ball.dir));
+                // sprintf(command, "(catch %lf)", Add(head_to_body_angle, ball.dir));
+                Catch(Add(head_to_body_angle, ball.dir));
                 SendCmd(command);
                 return;
             }
         }
         else if (!ball.visible)
         {
-            sprintf(command, "(turn %lf)", view_angle);
+            // sprintf(command, "(turn %lf)", view_angle);
+            Turn(view_angle);
             SendCmd(command);
             return;
         }
         else if (fabs(ball.dir + ball.diff_dir) > view_angle / 2) // 球会超出视野
         {
-            sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            // sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            Turn(ball.dir + ball.diff_dir);
             SendCmd(command);
             return;
         }
@@ -1263,14 +1272,16 @@ void Client::ParseMsg(char *msg)
                 }
                 else
                 {
-                    sprintf(command, "(turn %lf)", ball.dir);
+                    // sprintf(command, "(turn %lf)", ball.dir);
+                    Turn(ball.dir);
                     SendCmd(command);
                     return;
                 }
             }
             else // 球速小于1，可以直接拦截
             {
-                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                // sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                Dash(100, ball.dir + ball.diff_dir);
                 SendCmd(command);
                 return;
             }
@@ -1280,7 +1291,8 @@ void Client::ParseMsg(char *msg)
             SendCmd(command);
             return;
         }
-        sprintf(command, "(turn %lf)", ball.dir);
+        // sprintf(command, "(turn %lf)", ball.dir);
+        Turn(ball.dir);
         SendCmd(command);
         return;
     }
@@ -1295,7 +1307,8 @@ void Client::ParseMsg(char *msg)
     */
     if (kicked) // 踢球之后转向踢球方向
     {
-        sprintf(command, "(turn %lf)", kickdir);
+        // sprintf(command, "(turn %lf)", kickdir);
+        Turn(kickdir);
         SendCmd(command);
         return;
     }
@@ -1304,14 +1317,16 @@ void Client::ParseMsg(char *msg)
         if (fabs(ball.dir) < view_angle / 2 && ball.speed > 1)
         {
             kickdir = Add(head_to_body_angle, ball.dir);
-            sprintf(command, "(kick %lf %lf)", ball.speed / RATE, kickdir); // 停球
+            // sprintf(command, "(kick %lf %lf)", ball.speed / RATE, kickdir); // 停球
+            Kick(ball.speed / RATE, kickdir);
             SendCmd(command);
             return;
         }
         if (CanGoal()) // 判断是否可以射门
         {
             kickdir = goaldir;
-            sprintf(command, "(kick 100 %lf)", kickdir); // 射门
+            // sprintf(command, "(kick 100 %lf)", kickdir); // 射门
+            Kick(100, kickdir);
             SendCmd(command);
             return;
         }
@@ -1367,12 +1382,14 @@ void Client::ParseMsg(char *msg)
             {
                 CanGoal();
                 kickdir = goaldir;
-                sprintf(command, "(kick 100 %lf)", kickdir);
+                // sprintf(command, "(kick 100 %lf)", kickdir);
+                Kick(100, kickdir);
                 SendCmd(command);
                 return;
             }
             kickdir = teammates[matei].dir;
-            sprintf(command, "(kick 100 %lf)", kickdir);
+            // sprintf(command, "(kick 100 %lf)", kickdir);
+            Kick(100, kickdir);
             SendCmd(command);
             return;
         }
@@ -1380,7 +1397,8 @@ void Client::ParseMsg(char *msg)
         {
             CanGoal();
             kickdir = goaldir;
-            sprintf(command, "(kick 100 %lf)", kickdir);
+            // sprintf(command, "(kick 100 %lf)", kickdir);
+            Kick(100, kickdir);
             SendCmd(command);
             return;
         }
@@ -1404,13 +1422,15 @@ void Client::ParseMsg(char *msg)
         }
         if (!ball.visible)
         {
-            sprintf(command, "(turn %lf)", (ball.dir > 0) ? view_angle : -view_angle); // 找球
+            // sprintf(command, "(turn %lf)", (ball.dir > 0) ? view_angle : -view_angle); // 找球
+            Turn((ball.dir > 0) ? view_angle : -view_angle);
             SendCmd(command);
             return;
         }
         else if (fabs(ball.dir + ball.diff_dir) > view_angle / 2) // 球会超出视野范围
         {
-            sprintf(command, "(turn %lf)", ball.dir + (ball.diff_dir > 0 ? view_angle / 2 : -view_angle / 2));
+            // sprintf(command, "(turn %lf)", ball.dir + (ball.diff_dir > 0 ? view_angle / 2 : -view_angle / 2));
+            Turn(ball.dir + (ball.diff_dir > 0 ? view_angle / 2 : -view_angle / 2));
             SendCmd(command);
             return;
         }
@@ -1437,14 +1457,16 @@ void Client::ParseMsg(char *msg)
             }
             else
             {
-                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                // sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                Dash(100, ball.dir + ball.diff_dir);
                 SendCmd(command); // 跑向球
                 return;
             }
         }
         else
         {
-            sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            // sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            Turn(ball.dir + ball.diff_dir);
             SendCmd(command);
             return;
         }
