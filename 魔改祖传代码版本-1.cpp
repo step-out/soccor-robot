@@ -39,13 +39,13 @@
 using namespace std;
 
 const double PI = 3.14159265359;    // 圆周率
-const char team_name[20] = "team1"; // 球队名称
-const double margin = 0.7;          // 可踢范围0.7米
-const double rate = 0.027;
-const double player_size = 0.3; // 球员大小
-const double ball_size = 0.085; // 球的大小
-const double max_speed = 1;     // 球员最大速度
-const double dash_power_rate = 0.006;
+const char TEAM_NAME[20] = "soccor-eater"; // 球队名称
+const double MARGIN = 0.7;          // 可踢范围0.7米
+const double RATE = 0.027;
+const double PLAYER_SIZE = 0.3; // 球员大小
+const double BALL_SIZE = 0.085; // 球的大小
+const double MAX_SPEED = 1;     // 球员最大速度
+const double DASH_POWER_RATE = 0.006;
 char play_mode[30];    // 比赛模式
 int current_cycle = 0; // 当前周期
 int last_cycle = 0;    // 上一个周期
@@ -56,7 +56,7 @@ enum PlayerRole
 {
     goalkeeper,
     defender,
-    midfield,
+    centre_forword,
     striker
 } role = striker;  // 守门员、后卫、中场、前锋
 double inix = -50; // 初始化在场上的位置
@@ -92,28 +92,28 @@ bool kicked = 0;               // 上一个周期是否踢到球
 bool catched = 0;              // 上一个周期是否扑到球
 double kickdir = 0;            // 踢球方向
 double goaldir, goaldist;      // 球门方向和距离
-double goalx, goaly;
-double goaltx, goalty;
-double goalbx, goalby;
-double getballx = 0; // 截球点
-double getbally = 0;
+double goal_x, goal_y;
+double goal_tx, goal_ty;
+double goal_bx, goal_by;
+double get_ball_x = 0; // 截球点
+double get_ball_y = 0;
 int wait = 0;     // 等待时间，此期间不移动
 bool waited = 0;  // 是否等待了
 char command[50]; // 向server发送的消息
 
 struct Flags // 标志
 {
-    bool cansee; // 能否看见
+    bool visible; // 能否看见
     double dist; // 距离
     double dir;  // 方向
 } flags[55];     // 55个标志
 
 struct Ball // 球
 {
-    bool cansee;               // 能否看见
+    bool visible;               // 能否看见
     bool moving;               // 是否在移动
-    double diffdist;           // 距离的相对变化
-    double diffdir;            // 方向的相对变化
+    double diff_dist;           // 距离的相对变化
+    double diff_dir;            // 方向的相对变化
     double x[50];              // x坐标
     double y[50];              // y坐标
     double dist;               // 距离
@@ -128,8 +128,8 @@ struct Player // 球员
     double y;
     double dist;
     double dir;
-    double diffdist;
-    double diffdir;
+    double diff_dist;
+    double diff_dir;
 } teammates[11], opponents[22]; // 队友和对手，不能区分的算作对手
 
 char flagName[55][20] =
@@ -158,25 +158,25 @@ struct Flag_coord flag_coord[55] =
 
 struct Lines // 边线
 {
-    bool cansee;
+    bool visible;
     double dist;
     double dir;
 } lines[4];
 
-char linename[4][6] = {"(l l)", "(l r)", "(l t)", "(l b)"}; // 边线名称
+char line_name[4][6] = {"(l l)", "(l r)", "(l t)", "(l b)"}; // 边线名称
 double line_global_angle[4] = {-180, 0, -90, 90};           // 边线的全局角度
 
-double ang_to_rad(double x) // 角度转弧度
+double AngToRad(double x) // 角度转弧度
 {
     return x * PI / 180.0;
 }
 
-double rad_to_ang(double x) // 弧度转角度
+double RadToAng(double x) // 弧度转角度
 {
     return x * 180.0 / PI;
 }
 
-double add(double x, double y) // 角度相加
+double Add(double x, double y) // 角度相加
 {
     if (x + y > -180 && x + y <= 180)
         return x + y;
@@ -186,7 +186,7 @@ double add(double x, double y) // 角度相加
         return x + y - 360;
 }
 
-double sub(double x, double y) // 角度相减
+double Sub(double x, double y) // 角度相减
 {
     if (x - y > -180 && x - y <= 180)
         return x - y;
@@ -196,12 +196,12 @@ double sub(double x, double y) // 角度相减
         return x - y - 360;
 }
 
-double distance(double x1, double y1, double x2, double y2) //(x1,y2)到(x2,y2)的距离
+double Distance(double x1, double y1, double x2, double y2) //(x1,y2)到(x2,y2)的距离
 {
     return sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
 }
 
-double calDir(double x1, double y1, double x2, double y2) //(x1,y2)到(x2,y2)的全局方向
+double CalDir(double x1, double y1, double x2, double y2) //(x1,y2)到(x2,y2)的全局方向
 {
     if (x1 == x2 && y1 == y2)
         return 0;
@@ -222,18 +222,18 @@ double calDir(double x1, double y1, double x2, double y2) //(x1,y2)到(x2,y2)的
     else
     {
         if (x2 > x1)
-            return rad_to_ang(atan((y2 - y1) / (x2 - x1)));
+            return RadToAng(atan((y2 - y1) / (x2 - x1)));
         else
         {
             if (y2 < y1)
-                return rad_to_ang(atan((y2 - y1) / (x2 - x1))) - 180.0;
+                return RadToAng(atan((y2 - y1) / (x2 - x1))) - 180.0;
             else
-                return rad_to_ang(atan((y2 - y1) / (x2 - x1))) + 180.0;
+                return RadToAng(atan((y2 - y1) / (x2 - x1))) + 180.0;
         }
     }
 }
 
-double randf(double a, double b) // 产生[a,b]之间的随机浮点数
+double Randf(double a, double b) // 产生[a,b]之间的随机浮点数
 {
     srand(time(0));
     return 1.0 * rand() / RAND_MAX * (b - a) + a;
@@ -257,29 +257,29 @@ public:
                                                         M_transport(NULL), M_comp_level(-1), M_clean_cycle(true)
     {
         M_dest.setHost(server);
-        open();
-        bind();
+        Open();
+        Bind();
         M_socket_buf->setEndPoint(M_dest);
     }
     virtual ~Client()
     {
-        close();
+        Close();
     }
-    int open()
+    int Open()
     {
-        if (M_socket.open())
+        if (M_socket.Open())
         {
             if (M_socket.setNonBlocking() < 0)
             {
                 std::cerr << __FILE__ << ": " << __LINE__ << ": Error setting socket non-blocking: " << strerror(errno) << std::endl;
-                M_socket.close();
+                M_socket.Close();
                 return -1;
             }
         }
         else
         {
             std::cerr << __FILE__ << ": " << __LINE__ << ": Error opening socket: " << strerror(errno) << std::endl;
-            M_socket.close();
+            M_socket.Close();
             return -1;
         }
 
@@ -287,19 +287,19 @@ public:
         M_transport = new std::ostream(M_socket_buf);
         return 0;
     }
-    bool bind()
+    bool Bind()
     {
-        if (!M_socket.bind(rcss::net::Addr()))
+        if (!M_socket.Bind(rcss::net::Addr()))
         {
             std::cerr << __FILE__ << ": " << __LINE__ << ": Error connecting socket" << std::endl;
-            M_socket.close();
+            M_socket.Close();
             return false;
         }
         return true;
     }
-    void close()
+    void Close()
     {
-        M_socket.close();
+        M_socket.Close();
         if (M_transport)
         {
             delete M_transport;
@@ -316,7 +316,7 @@ public:
             M_socket_buf = NULL;
         }
     }
-    int setCompression(int level)
+    int SetCompression(int level)
     {
 #ifdef HAVE_LIBZ
         if (level >= 0)
@@ -336,7 +336,7 @@ public:
 #endif
         return M_comp_level = -1;
     }
-    void processMsg(char *msg, int len)
+    void ProcessMsg(char *msg, int len)
     {
 #ifdef HAVE_LIBZ
         if (M_comp_level >= 0)
@@ -347,16 +347,16 @@ public:
             M_decomp.getOutput(out, size);
             if (size > 0)
             {
-                parseMsg(out);
+                ParseMsg(out);
             }
         }
         else
 #endif
         {
-            parseMsg(msg);
+            ParseMsg(msg);
         }
     }
-    void messageLoop()
+    void MessageLoop()
     {
         fd_set read_fds;
         fd_set read_fds_back;
@@ -368,14 +368,14 @@ public:
         FD_SET(M_socket.getFD(), &read_fds);
         read_fds_back = read_fds;
 #ifdef RCSS_WIN
-        int Maxfd = 0;
+        int max_fd = 0;
 #else
-        int Maxfd = M_socket.getFD() + 1;
+        int max_fd = M_socket.getFD() + 1;
 #endif
         while (1)
         {
             read_fds = read_fds_back;
-            int ret = ::select(Maxfd, &read_fds, NULL, NULL, NULL);
+            int ret = ::select(max_fd, &read_fds, NULL, NULL, NULL);
             if (ret < 0)
             {
                 perror("Error selecting input");
@@ -403,7 +403,7 @@ public:
                                 std::cerr << __FILE__ << ": " << __LINE__ << ": Error sending to socket: " << strerror(errno) << std::endl
                                           << "msg = [" << buf << "]\n";
                             }
-                            M_socket.close();
+                            M_socket.Close();
                         }
                         std::cout << buf << std::endl;
                     }
@@ -418,25 +418,25 @@ public:
                         {
                             std::cerr << __FILE__ << ": " << __LINE__ << ": Error receiving from socket: " << strerror(errno) << std::endl;
                         }
-                        M_socket.close();
+                        M_socket.Close();
                     }
                     else if (len > 0)
                     {
                         M_dest.setPort(from.getPort());
                         M_socket_buf->setEndPoint(M_dest);
-                        processMsg(buf, len);
+                        ProcessMsg(buf, len);
                     }
                 }
             }
         }
     }
     // 向server发送命令
-    bool sendCmd(char *command);
+    bool SendCmd(char *command);
     // 解析server发送的信息
-    void init(char *msg);       // 初始化
-    void hear(char *msg);       // hear，获知比赛模式
-    void sense_body(char *msg); // sense_body
-    void see(char *msg);        // see，看到标志、边线、球、球员等信息
+    void Init(char *msg);       // 初始化
+    void Hear(char *msg);       // Hear，获知比赛模式
+    void SenseBody(char *msg); // SenseBody
+    void See(char *msg);        // See，看到标志、边线、球、球员等信息
     // 球员基础行为命令
     void Kick(double power, double direction);
     void Dash(double power, double direction);
@@ -445,24 +445,24 @@ public:
     void Tackle(double power);
     void Move(double x, double y);
     void Catch(double direction);
-    void Change_view(const char *width, const char *quality);
+    void ChangeView(const char *width, const char *quality);
     // 辅助函数
-    void updateINFO();                // 更新信息
-    bool turn(double angle);          // 转过一定角度
-    bool gotoPos(double x, double y); // 定点前往(x,y)
-    bool ballINField();               // 球是否在自己的活动范围内
-    bool ballINPenalty();             // 球是否在己方禁区内
-    bool ballINOppopenalty();         // 球是否在对方禁区内
-    bool canGoal();                   // 能否射门，并给出射门角度
-    int ballWay();                    // 分析球的走向，不动或者远离返回0，否则返回1
-    void parseMsg(char *msg);
-    void run();
+    void UpdateINFO();                // 更新信息
+    bool Turn(double angle);          // 转过一定角度
+    bool GotoPos(double x, double y); // 定点前往(x,y)
+    bool BallINField();               // 球是否在自己的活动范围内
+    bool BallINPenalty();             // 球是否在己方禁区内
+    bool BallINOppopenalty();         // 球是否在对方禁区内
+    bool CanGoal();                   // 能否射门，并给出射门角度
+    int BallWay();                    // 分析球的走向，不动或者远离返回0，否则返回1
+    void ParseMsg(char *msg);
+    void Run();
 };
 
 namespace
 {
     Client *client = static_cast<Client *>(0);
-    void sig_exit_handle(int)
+    void SigExitHandle(int)
     {
         std::cerr << "\nKilled. Exiting..." << std::endl;
         if (client)
@@ -473,7 +473,7 @@ namespace
         std::exit(EXIT_FAILURE);
     }
 }
-bool Client::sendCmd(char *command)
+bool Client::SendCmd(char *command)
 {
     int len;
     len = strlen(command) + 1;
@@ -487,10 +487,10 @@ bool Client::sendCmd(char *command)
     }
     return true;
 }
-void Client::init(char *msg) // 初始化
+void Client::Init(char *msg) // 初始化
 {
     /*
-    init函数用于根据传入的消息字符串进行初始化操作。
+    Init函数用于根据传入的消息字符串进行初始化操作。
     根据消息中的角色信息（左方或右方），设置相关变量的初始值，
     包括位置坐标、比赛模式等。根据角色的不同，还进行了一些特定的坐标和目标位置的设置。
     */
@@ -503,12 +503,12 @@ void Client::init(char *msg) // 初始化
         side = 0;
         x = sidex = inix;
         y = sidey = iniy;
-        goalx = flag_coord[3].x; // 对于左方而言goal是右边的球门
-        goaly = flag_coord[3].y;
-        goaltx = flag_coord[4].x;
-        goalty = flag_coord[4].y;
-        goalbx = flag_coord[5].x;
-        goalby = flag_coord[5].y;
+        goal_x = flag_coord[3].x; // 对于左方而言goal是右边的球门
+        goal_y = flag_coord[3].y;
+        goal_tx = flag_coord[4].x;
+        goal_ty = flag_coord[4].y;
+        goal_bx = flag_coord[5].x;
+        goal_by = flag_coord[5].y;
     }
     else // 右方
     {
@@ -521,12 +521,12 @@ void Client::init(char *msg) // 初始化
         maxx = -maxx;
         miny = -miny;
         maxy = -maxy;
-        goalx = flag_coord[0].x; // 对于右方而言goal是左边的球门
-        goaly = flag_coord[0].y;
-        goaltx = flag_coord[1].x;
-        goalty = flag_coord[1].y;
-        goalbx = flag_coord[2].x;
-        goalby = flag_coord[2].y;
+        goal_x = flag_coord[0].x; // 对于右方而言goal是左边的球门
+        goal_y = flag_coord[0].y;
+        goal_tx = flag_coord[1].x;
+        goal_ty = flag_coord[1].y;
+        goal_bx = flag_coord[2].x;
+        goal_by = flag_coord[2].y;
     }
 }
 /*
@@ -535,31 +535,36 @@ void Client::init(char *msg) // 初始化
 如果角色不属于上述任何一种情况或发送初始化命令失败，则函数提前结束。
 */
 
-void Client::hear(char *msg) // hear，获知比赛模式
+void Client::Hear(char *msg) // Hear，获知比赛模式
 {
-    sscanf(msg, "(hear %d referee %s)", &current_cycle, play_mode);
+    sscanf(msg, "(Hear %d referee %s)", &current_cycle, play_mode);
     play_mode[strlen(play_mode) - 1] = 0; // 去掉右括号')'
 }
 
-void Client::sense_body(char *msg) // sense_body
+void Client::SenseBody(char *msg) // SenseBody
 {
     int last_kick = kick_times;
     int last_catch = catch_times;
-    sscanf(msg, "(sense_body %d (view_mode %*s %s (stamina %lf %lf) (speed %lf %lf) (head_angle %lf) "
-                "(kick %d) (dash %*d) (turn %*d) (say %*d) (turn_neck %*d) (catch %d)",
+    sscanf(msg, "(SenseBody %d (view_mode %*s %s (stamina %lf %lf) (speed %lf %lf) (head_angle %lf) "
+                "(kick %d) (dash %*d) (Turn %*d) (say %*d) (Turn_neck %*d) (catch %d)",
            &current_cycle, view_width, &stamina, &effort,
            &speed, &speed_to_head_dir, &head_to_body_angle, &kick_times, &catch_times);
     view_width[strlen(view_width) - 1] = 0;
+
+    enum 
+
     if (!strcmp(view_width, "wide"))
         view_angle = 180; // 宽视野视角为180度
     else if (!strcmp(view_width, "normal"))
         view_angle = 90; // 普通视野视角为90度
     else
         view_angle = 45; // 窄视野视角为45度
+
     if (kick_times == last_kick + 1)
         kicked = 1; // 踢球次数加1，说明上一个周期踢到了球
     else
         kicked = 0;
+
     if (catch_times == last_catch + 1)
         catched = 1; // 扑球次数加1，说明上一个周期扑到了球
 }
@@ -575,27 +580,27 @@ void Client::see(char *msg) // see，看到标志、边线、球、球员等信�
         p = strstr(msg, flagName[i]); // 找标志
         if (p != 0)
         {
-            flags[i].cansee = 1; // 可见
+            flags[i].visible = 1; // 可见
             sprintf(format, "%s %%lf %%lf", flagName[i]);
             sscanf(p, format, &flags[i].dist, &flags[i].dir); // 获取标志距离和方向
         }
         else
         {
-            flags[i].cansee = 0; // 否则不可见
+            flags[i].visible = 0; // 否则不可见
         }
     }
     for (int i = 0; i < 4; i++)
     {
-        p = strstr(msg, linename[i]); // 找边线
+        p = strstr(msg, line_name[i]); // 找边线
         if (p != 0)
         {
-            lines[i].cansee = 1;
-            sprintf(format, "%s %%lf %%lf", linename[i]);
+            lines[i].visible = 1;
+            sprintf(format, "%s %%lf %%lf", line_name[i]);
             sscanf(p, format, &lines[i].dist, &lines[i].dir);
         }
         else
         {
-            lines[i].cansee = 0;
+            lines[i].visible = 0;
         }
     }
     sprintf(str, "(p"); // 找球员
@@ -618,19 +623,17 @@ void Client::see(char *msg) // see，看到标志、边线、球、球员等信�
             sscanf(p, "%s", tmp);
             p += strlen(tmp);
             tmp[strlen(tmp) - 1] = 0;
-            if (!strcmp(tmp, team_name)) // 队友
+            if (!strcmp(tmp, TEAM_NAME)) // 队友
             {
-                see_mate_num++;
-                teammates[i].diffdist = 0;
-                teammates[i].diffdir = 0;
-                sscanf(p, "%*s %lf %lf %lf %lf", &teammates[i].dist, &teammates[i].dir, &teammates[i].diffdist, &teammates[i].diffdir);
+                see_mate_num += 1;
+                teammates[i].diff_dist = teammates[i].diff_dir = 0;
+                sscanf(p, "%*s %lf %lf %lf %lf", &teammates[i].dist, &teammates[i].dir, &teammates[i].diff_dist, &teammates[i].diff_dir);
             }
             else // 对手
             {
-                see_oppo_num++;
-                opponents[i].diffdist = 0;
-                opponents[i].diffdir = 0;
-                sscanf(p, "%*s %lf %lf %lf %lf", &teammates[i].dist, &teammates[i].dir, &teammates[i].diffdist, &teammates[i].diffdir);
+                see_oppo_num += 1;
+                opponents[i].diff_dist = opponents[i].diff_dir = 0;
+                sscanf(p, "%*s %lf %lf %lf %lf", &teammates[i].dist, &teammates[i].dir, &teammates[i].diff_dist, &teammates[i].diff_dir);
             }
         }
         p = strstr(p, str);
@@ -644,15 +647,15 @@ void Client::see(char *msg) // see，看到标志、边线、球、球员等信�
     }
     if (p != 0)
     {
-        ball.cansee = 1;
-        ball.diffdist = 0;
-        ball.diffdir = 0;
+        ball.visible = 1;
+        ball.diff_dist = 0;
+        ball.diff_dir = 0;
         sprintf(format, "%s %%lf %%lf %%lf %%lf", str);
-        sscanf(p, format, &ball.dist, &ball.dir, &ball.diffdist, &ball.diffdir);
+        sscanf(p, format, &ball.dist, &ball.dir, &ball.diff_dist, &ball.diff_dir);
     }
     else
     {
-        ball.cansee = 0;
+        ball.visible = 0;
     }
     sprintf(str, "(G)"); // 找邻域的球门
     p = strstr(msg, str);
@@ -661,12 +664,12 @@ void Client::see(char *msg) // see，看到标志、边线、球、球员等信�
         sprintf(format, "%s %%lf %%lf", str);
         if (x < 0) // 左侧球门
         {
-            flags[0].cansee = 1;
+            flags[0].visible = 1;
             sscanf(p, format, &flags[0].dist, &flags[0].dir);
         }
         else // 右侧球门
         {
-            flags[3].cansee = 1;
+            flags[3].visible = 1;
             sscanf(p, format, &flags[3].dist, &flags[3].dir);
         }
     }
@@ -678,7 +681,7 @@ void Client::Kick(double power, double direction)
     power: 踢球的力量大小决定对球的加速大小
     direction: 踢球的角度
     球员的最大控球范围半径 = BALL_SIZE(0.085) + PLAYER_SIZE(0.3) + KICKABLE_MARGIN(0.7) = 1.085
-    实际踢球力量act_pow = power * (1 - 0.25 * (dir_diff / 180) - 0.25 * (dist_diff / kickable_margin)
+    实际踢球力量act_pow = power * (1 - 0.25 * (dir_diff / 180) - 0.25 * (dist_diff / kickable_MARGIN)
     dir_diff是球和球员身体方向之间的绝对角度
     dist_diff是球和球员之间的距离(球员和球圆边界之间的距离)
     球获得的加速度 = min(act_pow * KICKPOWERRATE(0.027), ball_accel_max = MAXPOWER * KICKPOWERRATE)
@@ -689,6 +692,7 @@ void Client::Kick(double power, double direction)
     */
     sprintf(command, "(kick %lf %lf)", power, direction);
 }
+
 void Client::Dash(double power, double direction)
 {
     /*
@@ -702,7 +706,7 @@ void Client::Dash(double power, double direction)
     球员速度噪声 PLAYER_RAND(0.1) * (v + a)
     球员最大速度PLAYER_SPEED_MAX = 1.05
     球员速度衰减PLAYER_DECAY = 0.4
-    注意：球员不能在同一个周期同时执行dash和turn两个命令
+    注意：球员不能在同一个周期同时执行dash和Turn两个命令
     */
     /*-----体力模型-----
     包含三个部分: stamina(体力值), effort(加速效率), recovery(体力恢复的速率)
@@ -725,13 +729,13 @@ void Client::Turn(double moment)
     实际转身角度act_ang = ((1.0 + r) * moment) / (1.0 + inertia_moment * player_speed)
     r [-PLAYER_RAND, PLAYER_RAND], PLAYER_RAND = 0.1
     球员惯性大小参数inertia_moment = IMPARAM = 5.0
-    注意：球员不能在同一个周期同时执行dash和turn两个命令
+    注意：球员不能在同一个周期同时执行dash和Turn两个命令
     */
-    sprintf(command, "(turn %lf)", moment);
+    sprintf(command, "(Turn %lf)", moment);
 }
 void Client::Turn_neck(double moment)
 {
-    sprintf(command, "(turn_neck %lf)", moment);
+    sprintf(command, "(Turn_neck %lf)", moment);
 }
 void Client::Tackle(double power)
 {
@@ -751,7 +755,7 @@ void Client::Catch(double direction)
     */
     sprintf(command, "(catch %lf)", direction);
 }
-void Client::Change_view(const char *width, const char *quality)
+void Client::ChangeView(const char *width, const char *quality)
 {
     /*
     width: 视野范围，wide(2)、normal(1)、narrow(0.5)
@@ -759,15 +763,15 @@ void Client::Change_view(const char *width, const char *quality)
     实际视野范围: view_angle = visible_angle(90) * view_width_factor
     视觉刷新频率: view_frequency = sense_step(150 ms) * view_quality_factor * view_width_factor
     */
-    sprintf(command, "(change_view %s %s)", width, quality);
+    sprintf(command, "(ChangeView %s %s)", width, quality);
 }
 
-void Client::updateINFO() // 更新信息
+void Client::UpdateINFO() // 更新信息
 {
     int seelinenum = 0, j = 0;
     for (int i = 0; i < 4; i++)
     {
-        if (lines[i].cansee)
+        if (lines[i].visible)
         {
             seelinenum++;
             if (seelinenum != 1)
@@ -781,48 +785,48 @@ void Client::updateINFO() // 更新信息
     }
     if (seelinenum != 1)
         infield = 0;                                                                                               // 看到超过两条边线，说明自己在场外
-    head_global_angle = sub(line_global_angle[j], (lines[j].dir < 0) ? (lines[j].dir + 90) : (lines[j].dir - 90)); // 确定头部的绝对方向
-    body_global_angle = sub(head_global_angle, head_to_body_angle);                                                // 确定身体的绝对方向
-    speed_global_angle = add(speed_to_head_dir, head_global_angle);                                                // 确定速度的绝对方向
+    head_global_angle = Sub(line_global_angle[j], (lines[j].dir < 0) ? (lines[j].dir + 90) : (lines[j].dir - 90)); // 确定头部的绝对方向
+    body_global_angle = Sub(head_global_angle, head_to_body_angle);                                                // 确定身体的绝对方向
+    speed_global_angle = Add(speed_to_head_dir, head_global_angle);                                                // 确定速度的绝对方向
     double mindist = 1000;
     for (int i = 0; i < 55; i++)
     {
-        if (flags[i].cansee && flags[i].dist < mindist)
+        if (flags[i].visible && flags[i].dist < mindist)
         {
             j = i;
             mindist = flags[i].dist;
         }
     } // 选择距离最近的标志来确定自己的位置
-    x = flag_coord[j].x - flags[j].dist * cos(ang_to_rad(add(flags[j].dir, head_global_angle)));
-    y = flag_coord[j].y - flags[j].dist * sin(ang_to_rad(add(flags[j].dir, head_global_angle)));
+    x = flag_coord[j].x - flags[j].dist * cos(AngToRad(Add(flags[j].dir, head_global_angle)));
+    y = flag_coord[j].y - flags[j].dist * sin(AngToRad(Add(flags[j].dir, head_global_angle)));
     for (int i = 0; i < see_mate_num; i++) // 确定队友的位置
     {
-        teammates[i].x = x + teammates[i].dist * cos(ang_to_rad(add(teammates[i].dir, head_global_angle)));
-        teammates[i].y = y + teammates[i].dist * sin(ang_to_rad(add(teammates[i].dir, head_global_angle)));
+        teammates[i].x = x + teammates[i].dist * cos(AngToRad(Add(teammates[i].dir, head_global_angle)));
+        teammates[i].y = y + teammates[i].dist * sin(AngToRad(Add(teammates[i].dir, head_global_angle)));
     }
     for (int i = 0; i < see_oppo_num; i++) // 确定对手的位置
     {
-        opponents[i].x = x + opponents[i].dist * cos(ang_to_rad(add(opponents[i].dir, head_global_angle)));
-        opponents[i].y = y + opponents[i].dist * sin(ang_to_rad(add(opponents[i].dir, head_global_angle)));
+        opponents[i].x = x + opponents[i].dist * cos(AngToRad(Add(opponents[i].dir, head_global_angle)));
+        opponents[i].y = y + opponents[i].dist * sin(AngToRad(Add(opponents[i].dir, head_global_angle)));
     }
-    if (ball.cansee) // 如果能看见球，确定球的位置
+    if (ball.visible) // 如果能看见球，确定球的位置
     {
         ball.x[0] = ball.x[1]; // 上一个周期球的位置
         ball.y[0] = ball.y[1];
-        ball.x[1] = x + ball.dist * cos(ang_to_rad(add(ball.dir, head_global_angle))); // 当前周期球的位置
-        ball.y[1] = y + ball.dist * sin(ang_to_rad(add(ball.dir, head_global_angle)));
-        if (distance(ball.x[0], ball.y[0], ball.x[1], ball.y[1]) < 0.1)
+        ball.x[1] = x + ball.dist * cos(AngToRad(Add(ball.dir, head_global_angle))); // 当前周期球的位置
+        ball.y[1] = y + ball.dist * sin(AngToRad(Add(ball.dir, head_global_angle)));
+        if (Distance(ball.x[0], ball.y[0], ball.x[1], ball.y[1]) < 0.1)
             ball.moving = 0; // 速度小于0.1视为没有移动
         else
             ball.moving = 1;
-        ball.speed_global_angle = calDir(ball.x[0], ball.y[0], ball.x[1], ball.y[1]); // 确定球的速度方向
+        ball.speed_global_angle = CalDir(ball.x[0], ball.y[0], ball.x[1], ball.y[1]); // 确定球的速度方向
         for (int i = 2; i < 50; i++)
         { // 预测球在接下来48个周期内的位置
-            ball.x[i] = ball.x[i - 1] + distance(ball.x[i - 2], ball.y[i - 2], ball.x[i - 1], ball.y[i - 1]) * 0.94 * cos(ang_to_rad(ball.speed_global_angle));
-            ball.y[i] = ball.y[i - 1] + distance(ball.x[i - 2], ball.y[i - 2], ball.x[i - 1], ball.y[i - 1]) * 0.94 * sin(ang_to_rad(ball.speed_global_angle));
+            ball.x[i] = ball.x[i - 1] + Distance(ball.x[i - 2], ball.y[i - 2], ball.x[i - 1], ball.y[i - 1]) * 0.94 * cos(AngToRad(ball.speed_global_angle));
+            ball.y[i] = ball.y[i - 1] + Distance(ball.x[i - 2], ball.y[i - 2], ball.x[i - 1], ball.y[i - 1]) * 0.94 * sin(AngToRad(ball.speed_global_angle));
         }
-        ball.speed = distance(ball.x[1], ball.y[1], ball.x[2], ball.y[2]); // 确定球的速度
-        if (ball.dist <= margin + ball_size + player_size)                 // 球在控球范围之内
+        ball.speed = Distance(ball.x[1], ball.y[1], ball.x[2], ball.y[2]); // 确定球的速度
+        if (ball.dist <= MARGIN + BALL_SIZE + PLAYER_SIZE)                 // 球在控球范围之内
         {
             ball_on_me = 1;
         }
@@ -833,7 +837,7 @@ void Client::updateINFO() // 更新信息
             ball_on_opposide = 0;
             for (int i = 0; i < see_oppo_num; i++)
             {
-                if (distance(opponents[i].x, opponents[i].y, ball.x[1], ball.y[1]) <= margin + ball_size + player_size)
+                if (Distance(opponents[i].x, opponents[i].y, ball.x[1], ball.y[1]) <= MARGIN + BALL_SIZE + PLAYER_SIZE)
                 {
                     ball_on_opposide = 1; // 球在对手那里
                 }
@@ -842,7 +846,7 @@ void Client::updateINFO() // 更新信息
             {
                 for (int i = 0; i < see_mate_num; i++) // 球在队友那里
                 {
-                    if (distance(teammates[i].x, teammates[i].y, ball.x[1], ball.y[1]) <= margin + ball_size + player_size)
+                    if (Distance(teammates[i].x, teammates[i].y, ball.x[1], ball.y[1]) <= MARGIN + BALL_SIZE + PLAYER_SIZE)
                     {
                         ball_on_side = 1;
                     }
@@ -852,7 +856,7 @@ void Client::updateINFO() // 更新信息
     }
 }
 
-bool Client::turn(double angle) // 转过一定角度
+bool Client::Turn(double angle) // 转过一定角度
 {
     static int turn_times = 0;
     static double turn_angle = 0;
@@ -869,27 +873,27 @@ bool Client::turn(double angle) // 转过一定角度
     turn_times++;
     double fact_turn = turn_angle / (1.0 + 5.0 * speed); // 实际转过的角度
     Turn(turn_angle);
-    turn_angle = sub(turn_angle, fact_turn);
+    turn_angle = Sub(turn_angle, fact_turn);
     return 1;
 }
-bool Client::gotoPos(double x, double y) // 定点前往(x,y)
+bool Client::GotoPos(double x, double y) // 定点前往(x,y)
 {
-    if (distance(x, y, x, y) < margin)
+    if (Distance(x, y, x, y) < MARGIN)
         return 0;
     else
     {
-        Dash(100, sub(calDir(x, y, x, y), body_global_angle));
+        Dash(100, Sub(CalDir(x, y, x, y), body_global_angle));
         return 1;
     }
 }
-bool Client::ballINField() // 球是否在自己的活动范围内
+bool Client::BallINField() // 球是否在自己的活动范围内
 {
     if (ball.x[1] >= minx && ball.x[1] <= maxx && ball.y[1] >= miny && ball.y[1] <= maxy)
         return 1;
     else
         return 0;
 }
-bool Client::ballINPenalty() // 球是否在己方禁区内
+bool Client::BallINPenalty() // 球是否在己方禁区内
 {
     if (side == 0)
     {
@@ -906,7 +910,7 @@ bool Client::ballINPenalty() // 球是否在己方禁区内
             return 0;
     }
 }
-bool Client::ballINOppopenalty() // 球是否在对方禁区内
+bool Client::BallINOppopenalty() // 球是否在对方禁区内
 {
     if (side == 0)
     {
@@ -923,47 +927,47 @@ bool Client::ballINOppopenalty() // 球是否在对方禁区内
             return 0;
     }
 }
-bool Client::canGoal() // 能否射门，并给出射门角度
+bool Client::CanGoal() // 能否射门，并给出射门角度
 {
     double ang1, ang2;
-    goaldist = sqrt(pow(goalx - x, 2) + pow(goaly - y, 2));
-    ang1 = sub(calDir(x, y, goaltx, goalty), body_global_angle);
-    ang2 = sub(calDir(x, y, goalbx, goalby), body_global_angle);
+    goaldist = sqrt(pow(goal_x - x, 2) + pow(goal_y - y, 2));
+    ang1 = Sub(CalDir(x, y, goal_tx, goal_ty), body_global_angle);
+    ang2 = Sub(CalDir(x, y, goal_bx, goal_by), body_global_angle);
     if (ang1 > ang2)
         swap(ang1, ang2);
     if (ang2 - ang1 > 180)
         goaldir = ang1;
     else
-        goaldir = randf(ang1 + 1, ang2 - 1);
+        goaldir = Randf(ang1 + 1, ang2 - 1);
     if (goaldist > 30)
         return 0;
     else
         return 1;
 }
-int Client::ballWay() // 分析球的走向，不动或者远离返回0，否则返回1
+int Client::BallWay() // 分析球的走向，不动或者远离返回0，否则返回1
 {
     if (!ball.moving)
         return 0;
-    if (distance(x, y, ball.x[1], ball.y[1]) <= distance(x, y, ball.x[2], ball.y[2]))
+    if (Distance(x, y, ball.x[1], ball.y[1]) <= Distance(x, y, ball.x[2], ball.y[2]))
     {
         return 0;
     }
     double mindist = ball.dist;
     for (int i = 2; i < 50; i++) // 给出距离自己最近的点作为截球点
     {
-        if (distance(x, y, ball.x[i], ball.y[i]) < mindist)
+        if (Distance(x, y, ball.x[i], ball.y[i]) < mindist)
         {
-            mindist = distance(x, y, ball.x[i], ball.y[i]);
+            mindist = Distance(x, y, ball.x[i], ball.y[i]);
             if (fabs(ball.x[i]) > 52.5 || fabs(ball.y[i]) > 34)
             {
-                getballx = ball.x[i - 1];
-                getbally = ball.y[i - 1];
+                get_ball_x = ball.x[i - 1];
+                get_ball_y = ball.y[i - 1];
                 break;
             }
             else
             {
-                getballx = ball.x[i];
-                getbally = ball.y[i];
+                get_ball_x = ball.x[i];
+                get_ball_y = ball.y[i];
             }
         }
     }
@@ -971,30 +975,30 @@ int Client::ballWay() // 分析球的走向，不动或者远离返回0，否则
 }
 
 /*
-parseMsg用于解析接收到的消息并根据不同的比赛状态和角色执行相应的操作
+ParseMsg用于解析接收到的消息并根据不同的比赛状态和角色执行相应的操作
 它包括初始化操作、处理声音信息、处理身体感知信息、处理视觉信息以及根据比赛状态和角色执行特定的动作
 */
-void Client::parseMsg(char *msg)
+void Client::ParseMsg(char *msg)
 {
     if (!strncmp(msg, "(init", 5)) // init
     {
-        init(msg);
-        Change_view("narrow", "high");
-        sendCmd(command);
+        Init(msg);
+        ChangeView("narrow", "high");
+        SendCmd(command);
         return;
     }
-    else if (!strncmp(msg, "(hear", 5)) // hear
+    else if (!strncmp(msg, "(Hear", 5)) // Hear
     {
-        hear(msg);
+        Hear(msg);
     }
-    else if (!strncmp(msg, "(sense_body", 11)) // sense_body
+    else if (!strncmp(msg, "(SenseBody", 11)) // SenseBody
     {
-        sense_body(msg);
+        SenseBody(msg);
     }
     else if (!strncmp(msg, "(see", 4)) // see
     {
-        see(msg);
-        updateINFO(); // 更新信息
+        See(msg);
+        UpdateINFO(); // 更新信息
     }
     else
         return;
@@ -1008,15 +1012,15 @@ void Client::parseMsg(char *msg)
     if (!strcmp(play_mode, "before_kick_off") || !strncmp(play_mode, "goal_l", 6) || !strncmp(play_mode, "goal_r", 6))
     {
         // 开球之前或者进球之后，回到初始化地点
-        if (distance(x, y, sidex, sidey) > 1)
+        if (Distance(x, y, sidex, sidey) > 1)
         {
             Move(inix, iniy);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
-        else if (turn(sub(calDir(x, y, 0, 0), body_global_angle))) // 面向(0,0)的位置
+        else if (Turn(Sub(CalDir(x, y, 0, 0), body_global_angle))) // 面向(0,0)的位置
         {
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else
@@ -1026,17 +1030,17 @@ void Client::parseMsg(char *msg)
     {
         if (id == 11) // 11号球员开球
         {
-            if (gotoPos(-0.4, 0))
+            if (GotoPos(-0.4, 0))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
-            if (randf(0, 1) > 0.5)
-                kickdir = sub(calDir(x, y, 3, 20), body_global_angle);
+            if (Randf(0, 1) > 0.5)
+                kickdir = Sub(CalDir(x, y, 3, 20), body_global_angle);
             else
-                kickdir = sub(calDir(x, y, 3, -20), body_global_angle);
+                kickdir = Sub(CalDir(x, y, 3, -20), body_global_angle);
             Kick(80, kickdir);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else
@@ -1046,17 +1050,17 @@ void Client::parseMsg(char *msg)
     {
         if (id == 11) // 11号球员开球
         {
-            if (gotoPos(0.4, 0))
+            if (GotoPos(0.4, 0))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
-            if (randf(0, 1) > 0.5)
-                kickdir = sub(calDir(x, y, -3, 20), body_global_angle);
+            if (Randf(0, 1) > 0.5)
+                kickdir = Sub(CalDir(x, y, -3, 20), body_global_angle);
             else
-                kickdir = sub(calDir(x, y, -3, -20), body_global_angle);
+                kickdir = Sub(CalDir(x, y, -3, -20), body_global_angle);
             Kick(80, kickdir);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else
@@ -1067,7 +1071,7 @@ void Client::parseMsg(char *msg)
              (side == 1 && (!strcmp(play_mode, "free_kick_r") || !strcmp(play_mode, "goal_kick_r") ||
                             !strcmp(play_mode, "indirect_free_kick_r") || !strcmp(play_mode, "kick_in_r") || !strcmp(play_mode, "corner_kick_r"))))
     { // 我方发球
-        if (ballINPenalty())
+        if (BallINPenalty())
         {
             if (role == goalkeeper)
             {
@@ -1090,10 +1094,10 @@ void Client::parseMsg(char *msg)
                     {
                         catch_moved = 1;
                         if (side)
-                            Move(randf(-maxx + 2, -minx - 2), randf(-maxy + 2, -miny - 2));
+                            Move(Randf(-maxx + 2, -minx - 2), Randf(-maxy + 2, -miny - 2));
                         else
-                            Move(randf(minx + 2, maxx - 2), randf(miny + 2, maxy - 2));
-                        sendCmd(command);
+                            Move(Randf(minx + 2, maxx - 2), Randf(miny + 2, maxy - 2));
+                        SendCmd(command);
                         return;
                     }
                     else
@@ -1102,82 +1106,82 @@ void Client::parseMsg(char *msg)
                         catched = 0;
                         waited = 0;
                         wait = 0;
-                        sprintf(command, "(kick 100 %lf)", sub(side ? 180 : 0, body_global_angle));
-                        sendCmd(command);
+                        sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                        SendCmd(command);
                         return;
                     }
                 }
-                else if (!ball.cansee)
+                else if (!ball.visible)
                 {
                     sprintf(command, "(turn %lf)", view_angle);
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
-                else if (turn(ball.dir))
+                else if (Turn(ball.dir))
                 {
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
-                else if (gotoPos(ball.x[1], ball.y[1]))
+                else if (GotoPos(ball.x[1], ball.y[1]))
                 {
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
                 else
                 {
-                    sprintf(command, "(kick 100 %lf)", sub(side ? 180 : 0, body_global_angle));
-                    sendCmd(command);
+                    sprintf(command, "(kick 100 %lf)", Sub(side ? 180 : 0, body_global_angle));
+                    SendCmd(command);
                     return;
                 }
             }
         }
         else
         {
-            if (role == midfield && stamina > 3500)
+            if (role == centre_forword && stamina > 3500)
             {
-                if (!ball.cansee)
+                if (!ball.visible)
                 {
                     sprintf(command, "(turn %lf)", view_angle);
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
-                else if (turn(ball.dir))
+                else if (Turn(ball.dir))
                 {
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
-                else if (gotoPos(ball.x[1], ball.y[1]))
+                else if (GotoPos(ball.x[1], ball.y[1]))
                 {
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
                 else
                 {
-                    canGoal();
+                    CanGoal();
                     kickdir = goaldir;
                     sprintf(command, "(kick 100 %lf)", kickdir);
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
             }
         }
         if (role != striker)
         {
-            if (distance(x, y, sidex, sidey) >= margin && turn(sub(calDir(x, y, sidex, sidey), body_global_angle)))
+            if (Distance(x, y, sidex, sidey) >= MARGIN && Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
-            else if (gotoPos(sidex, sidey))
+            else if (GotoPos(sidex, sidey))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
         }
-        if (!ball.cansee)
+        if (!ball.visible)
         {
             sprintf(command, "(turn %lf)", view_angle);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else
@@ -1194,21 +1198,21 @@ void Client::parseMsg(char *msg)
             return;
         if (role != striker)
         {
-            if (distance(x, y, sidex, sidey) >= margin && turn(sub(calDir(x, y, sidex, sidey), body_global_angle)))
+            if (Distance(x, y, sidex, sidey) >= MARGIN && Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
-            else if (gotoPos(sidex, sidey))
+            else if (GotoPos(sidex, sidey))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
         }
-        if (!ball.cansee)
+        if (!ball.visible)
         {
             sprintf(command, "(turn %lf)", view_angle);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else
@@ -1216,42 +1220,42 @@ void Client::parseMsg(char *msg)
     }
     if (role == goalkeeper) // 守门员
     {
-        if (ball.cansee && ball.dist <= 2) // 扑球
+        if (ball.visible && ball.dist <= 2) // 扑球
         {
             if (fabs(ball.dir) > 90)
             {
                 sprintf(command, "(dash 100 %lf)", ball.dir);
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
             else
             {
-                sprintf(command, "(catch %lf)", add(head_to_body_angle, ball.dir));
-                sendCmd(command);
+                sprintf(command, "(catch %lf)", Add(head_to_body_angle, ball.dir));
+                SendCmd(command);
                 return;
             }
         }
-        else if (!ball.cansee)
+        else if (!ball.visible)
         {
             sprintf(command, "(turn %lf)", view_angle);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
-        else if (fabs(ball.dir + ball.diffdir) > view_angle / 2) // 球会超出视野
+        else if (fabs(ball.dir + ball.diff_dir) > view_angle / 2) // 球会超出视野
         {
-            sprintf(command, "(turn %lf)", ball.dir + ball.diffdir);
-            sendCmd(command);
+            sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            SendCmd(command);
             return;
         }
-        else if (ballINPenalty()) // 球在禁区内
+        else if (BallINPenalty()) // 球在禁区内
         {
             if (ball.speed > 1) // 球速大于1，选择扑球
             {
-                if (ballWay())
+                if (BallWay())
                 {
-                    if (gotoPos(getballx, getbally))
+                    if (GotoPos(get_ball_x, get_ball_y))
                     {
-                        sendCmd(command);
+                        SendCmd(command);
                         return;
                     }
                     else
@@ -1260,24 +1264,24 @@ void Client::parseMsg(char *msg)
                 else
                 {
                     sprintf(command, "(turn %lf)", ball.dir);
-                    sendCmd(command);
+                    SendCmd(command);
                     return;
                 }
             }
             else // 球速小于1，可以直接拦截
             {
-                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diffdir);
-                sendCmd(command);
+                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                SendCmd(command);
                 return;
             }
         }
-        if (gotoPos(sidex, sidey)) // 回到初始化点
+        if (GotoPos(sidex, sidey)) // 回到初始化点
         {
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         sprintf(command, "(turn %lf)", ball.dir);
-        sendCmd(command);
+        SendCmd(command);
         return;
     }
 
@@ -1292,23 +1296,23 @@ void Client::parseMsg(char *msg)
     if (kicked) // 踢球之后转向踢球方向
     {
         sprintf(command, "(turn %lf)", kickdir);
-        sendCmd(command);
+        SendCmd(command);
         return;
     }
-    if (ball.cansee && ball_on_me) // 球在自己这里
+    if (ball.visible && ball_on_me) // 球在自己这里
     {
         if (fabs(ball.dir) < view_angle / 2 && ball.speed > 1)
         {
-            kickdir = add(head_to_body_angle, ball.dir);
-            sprintf(command, "(kick %lf %lf)", ball.speed / rate, kickdir); // 停球
-            sendCmd(command);
+            kickdir = Add(head_to_body_angle, ball.dir);
+            sprintf(command, "(kick %lf %lf)", ball.speed / RATE, kickdir); // 停球
+            SendCmd(command);
             return;
         }
-        if (canGoal()) // 判断是否可以射门
+        if (CanGoal()) // 判断是否可以射门
         {
             kickdir = goaldir;
             sprintf(command, "(kick 100 %lf)", kickdir); // 射门
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else if (see_mate_num) // 看一下能否传球
@@ -1324,7 +1328,7 @@ void Client::parseMsg(char *msg)
                         bool judge = 1; // 判断是否可以传球
                         for (int j = 0; j < see_oppo_num; j++)
                         {
-                            if (fabs(sub(teammates[i].dir, opponents[j].dir)) < 5)
+                            if (fabs(Sub(teammates[i].dir, opponents[j].dir)) < 5)
                             {
                                 judge = 0;
                             }
@@ -1346,7 +1350,7 @@ void Client::parseMsg(char *msg)
                         bool judge = 1;
                         for (int j = 0; j < see_oppo_num; j++)
                         {
-                            if (fabs(sub(teammates[i].dir, opponents[j].dir)) < 5)
+                            if (fabs(Sub(teammates[i].dir, opponents[j].dir)) < 5)
                             {
                                 judge = 0;
                             }
@@ -1361,23 +1365,23 @@ void Client::parseMsg(char *msg)
             }
             if (fabs(matex - x) < 5) // 不考虑传球，依然射门
             {
-                canGoal();
+                CanGoal();
                 kickdir = goaldir;
                 sprintf(command, "(kick 100 %lf)", kickdir);
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
             kickdir = teammates[matei].dir;
             sprintf(command, "(kick 100 %lf)", kickdir);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
         else // 没有看见队友，依然射门
         {
-            canGoal();
+            CanGoal();
             kickdir = goaldir;
             sprintf(command, "(kick 100 %lf)", kickdir);
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
     }
@@ -1385,47 +1389,47 @@ void Client::parseMsg(char *msg)
     {
         if (x < minx || x > maxx || y < miny || y > maxy) // 超出了活动范围
         {
-            if (turn(sub(calDir(x, y, sidex, sidey), body_global_angle)))
+            if (Turn(Sub(CalDir(x, y, sidex, sidey), body_global_angle)))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
-            else if (gotoPos(sidex, sidey))
+            else if (GotoPos(sidex, sidey))
             {
-                sendCmd(command);
+                SendCmd(command);
                 return;
             }
             else
                 return;
         }
-        if (!ball.cansee)
+        if (!ball.visible)
         {
             sprintf(command, "(turn %lf)", (ball.dir > 0) ? view_angle : -view_angle); // 找球
-            sendCmd(command);
+            SendCmd(command);
             return;
         }
-        else if (fabs(ball.dir + ball.diffdir) > view_angle / 2) // 球会超出视野范围
+        else if (fabs(ball.dir + ball.diff_dir) > view_angle / 2) // 球会超出视野范围
         {
-            sprintf(command, "(turn %lf)", ball.dir + (ball.diffdir > 0 ? view_angle / 2 : -view_angle / 2));
-            sendCmd(command);
+            sprintf(command, "(turn %lf)", ball.dir + (ball.diff_dir > 0 ? view_angle / 2 : -view_angle / 2));
+            SendCmd(command);
             return;
         }
-        else if (ballINField())
+        else if (BallINField())
         {
             if (stamina < 3000)
             {
                 wait = 50; // 体力小于3000，休息50个周期
             }
-            if (wait && !ballINOppopenalty())
+            if (wait && !BallINOppopenalty())
             {
                 wait--;
                 return;
             }
-            if (ballWay())
+            if (BallWay())
             {
-                if (gotoPos(getballx, getbally))
+                if (GotoPos(get_ball_x, get_ball_y))
                 {
-                    sendCmd(command); // 前往截球
+                    SendCmd(command); // 前往截球
                     return;
                 }
                 else
@@ -1433,21 +1437,21 @@ void Client::parseMsg(char *msg)
             }
             else
             {
-                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diffdir);
-                sendCmd(command); // 跑向球
+                sprintf(command, "(dash 100 %lf)", ball.dir + ball.diff_dir);
+                SendCmd(command); // 跑向球
                 return;
             }
         }
         else
         {
-            sprintf(command, "(turn %lf)", ball.dir + ball.diffdir);
-            sendCmd(command);
+            sprintf(command, "(turn %lf)", ball.dir + ball.diff_dir);
+            SendCmd(command);
             return;
         }
     }
     return;
 }
-void Client::run()
+void Client::Run()
 {
     if (role == goalkeeper) // 守门员活动范围限定在禁区内
     {
@@ -1463,7 +1467,7 @@ void Client::run()
         miny = -35;
         maxy = 35;
     }
-    else if (role == midfield)
+    else if (role == centre_forword)
     {
         minx = -53;
         maxx = 25;
@@ -1480,19 +1484,19 @@ void Client::run()
     else
         return;
     if (role == goalkeeper)
-        sprintf(command, "(init %s (version 9) (goalie))", team_name); // 守门员上场
+        sprintf(command, "(init %s (version 9) (goalie))", TEAM_NAME); // 守门员上场
     else
-        sprintf(command, "(init %s (version 9))", team_name); // 普通球员上场
-    if (sendCmd(command) == 0)
+        sprintf(command, "(init %s (version 9))", TEAM_NAME); // 普通球员上场
+    if (SendCmd(command) == 0)
         return;
-    messageLoop();
+    MessageLoop();
 }
 
 int main(int argc, char **argv)
 {
-    if (signal(SIGINT, &sig_exit_handle) == SIG_ERR || 
-    signal(SIGTERM, &sig_exit_handle) == SIG_ERR || 
-    signal(SIGHUP, &sig_exit_handle) == SIG_ERR)
+    if (signal(SIGINT, &SigExitHandle) == SIG_ERR ||
+        signal(SIGTERM, &SigExitHandle) == SIG_ERR ||
+        signal(SIGHUP, &SigExitHandle) == SIG_ERR)
     {
         cerr << __FILE__ << ": " << __LINE__ << ": could not set signal handler: " << strerror(errno) << endl;
         exit(EXIT_FAILURE);
@@ -1509,6 +1513,6 @@ int main(int argc, char **argv)
             iniy = (double)atof(argv[++i]);
     }
     client = new Client(server, port);
-    client->run();
+    client->Run();
     return EXIT_SUCCESS;
 }
