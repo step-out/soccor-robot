@@ -6,9 +6,9 @@ sleep 1
 sleep 1
 ./src/rcssclient role 1 inix -44 iniy 000  &
 sleep 1
-./src/rcssclient role 1 inix -44 iniy -10  &
+./src/rcssclient role 3 inix -15 iniy -15  &
 sleep 1
-./src/rcssclient role 1 inix -44 iniy 10  &
+./src/rcssclient role 3 inix -15 iniy 15  &
 sleep 1
 ./src/rcssclient role 3 inix -14 iniy -08  &
 sleep 1

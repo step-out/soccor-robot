@@ -47,7 +47,7 @@ enum PlayerRole
 };
 
 const double PI = 3.14159265359;           
-const char TEAM_NAME[20] = "soccor-eater"; 
+const char TEAM_NAME[20] = "soccer-eater"; 
 const double MARGIN = 0.7;                 
 const double RATE = 0.027;
 const double PLAYER_SIZE = 0.3; 
@@ -1428,10 +1428,13 @@ void Client::ParseMsg(char *msg)
             
             // Turn(ball.dir + ball.dir_change);
             // SendCmd(command);
-            if (GotoPos(sidex, sidey)) // 回到初始化点
+            if ((role == defender) || (role == goalkeeper))
             {
-                SendCmd(command);
-                return;
+                if (GotoPos(sidex, sidey)) // 回到初始化点
+                {
+                    SendCmd(command);
+                    return;
+                }
             }
             return;
         }
